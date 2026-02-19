@@ -89,6 +89,7 @@ pub struct SecurityPolicy {
     pub max_cost_per_day_cents: u32,
     pub require_approval_for_medium_risk: bool,
     pub block_high_risk_commands: bool,
+    pub enforce_command_allowlist: bool,
     pub tracker: ActionTracker,
 }
 
@@ -139,6 +140,7 @@ impl Default for SecurityPolicy {
             max_cost_per_day_cents: 500,
             require_approval_for_medium_risk: true,
             block_high_risk_commands: true,
+            enforce_command_allowlist: true,
             tracker: ActionTracker::new(),
         }
     }
@@ -580,10 +582,11 @@ impl SecurityPolicy {
                 continue;
             }
 
-            if !self
-                .allowed_commands
-                .iter()
-                .any(|allowed| allowed == base_cmd)
+            if self.enforce_command_allowlist
+                && !self
+                    .allowed_commands
+                    .iter()
+                    .any(|allowed| allowed == base_cmd)
             {
                 return false;
             }
@@ -757,6 +760,7 @@ impl SecurityPolicy {
             max_cost_per_day_cents: autonomy_config.max_cost_per_day_cents,
             require_approval_for_medium_risk: autonomy_config.require_approval_for_medium_risk,
             block_high_risk_commands: autonomy_config.block_high_risk_commands,
+            enforce_command_allowlist: autonomy_config.enforce_command_allowlist,
             tracker: ActionTracker::new(),
         }
     }
@@ -929,6 +933,29 @@ mod tests {
         };
         assert!(!p.is_command_allowed("ls"));
         assert!(!p.is_command_allowed("echo hello"));
+    }
+
+    #[test]
+    fn disabled_allowlist_allows_unlisted_commands() {
+        let p = SecurityPolicy {
+            enforce_command_allowlist: false,
+            allowed_commands: vec![], // empty, but shouldn't matter
+            ..SecurityPolicy::default()
+        };
+        assert!(p.is_command_allowed("date"));
+        assert!(p.is_command_allowed("python3 script.py"));
+    }
+
+    #[test]
+    fn disabled_allowlist_still_blocks_injection() {
+        let p = SecurityPolicy {
+            enforce_command_allowlist: false,
+            ..SecurityPolicy::default()
+        };
+        assert!(!p.is_command_allowed("echo $(whoami)"));
+        assert!(!p.is_command_allowed("echo `id`"));
+        assert!(!p.is_command_allowed("date > /tmp/out"));
+        assert!(!p.is_command_allowed("ls & rm -rf /"));
     }
 
     #[test]
@@ -1121,6 +1148,7 @@ mod tests {
         assert!(p.max_cost_per_day_cents > 0);
         assert!(p.require_approval_for_medium_risk);
         assert!(p.block_high_risk_commands);
+        assert!(p.enforce_command_allowlist);
     }
 
     // ── ActionTracker / rate limiting ───────────────────────

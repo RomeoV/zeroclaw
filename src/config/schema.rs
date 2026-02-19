@@ -1580,6 +1580,11 @@ pub struct AutonomyConfig {
     /// Tools that always require interactive approval, even after "Always".
     #[serde(default = "default_always_ask")]
     pub always_ask: Vec<String>,
+
+    /// When false, skip the command allowlist check (rely on systemd sandbox).
+    /// Injection/subshell/redirect checks are still enforced regardless.
+    #[serde(default = "default_true")]
+    pub enforce_command_allowlist: bool,
 }
 
 fn default_auto_approve() -> Vec<String> {
@@ -1635,6 +1640,7 @@ impl Default for AutonomyConfig {
             block_high_risk_commands: true,
             auto_approve: default_auto_approve(),
             always_ask: default_always_ask(),
+            enforce_command_allowlist: true,
         }
     }
 }
@@ -3559,6 +3565,7 @@ default_temperature = 0.7
                 block_high_risk_commands: true,
                 auto_approve: vec!["file_read".into()],
                 always_ask: vec![],
+                enforce_command_allowlist: true,
             },
             runtime: RuntimeConfig {
                 kind: "docker".into(),
